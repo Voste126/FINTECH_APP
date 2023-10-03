@@ -1,8 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
+from flask_bcrypt import Bcrypt
 db = SQLAlchemy()
 import re
 
+bcrypt = Bcrypt()
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -11,7 +13,7 @@ class User(db.Model):
 
     @validates
     def validate_password(self, password):
-        if len(password) < 12 or len(password) > 60:
+        if len(password) < 6 or len(password) > 60:
             raise ValueError("Password must be between 12 and 60 characters")
 
         if not re.search(r'[A-Z]', password):
@@ -23,6 +25,15 @@ class User(db.Model):
         if not re.search(r'[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]', password):
             raise ValueError("Password must contain at least one special character")
 
+    def __init__(self, username, password):
+        self.username = username
+        self.password = self.generate_password_hash(password)
+
+    def generate_password_hash(self, password):
+        return bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password, password)
 
 class Workout(db.Model):
     id = db.Column(db.Integer, primary_key=True)

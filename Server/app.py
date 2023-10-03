@@ -4,14 +4,73 @@ from models import db,User, Exercise, Workout
 from sqlalchemy.exc import IntegrityError
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import (
+    JWTManager, create_access_token, jwt_required, get_jwt_identity, create_refresh_token
+)
+import os
 
-
+# Initialize the JWT extension
+jwt = JWTManager()
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fitness_tracker.db'  # SQLite database
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Configure JWT settings
+# app.config['JWT_SECRET_KEY'] = 'f8643ceead4a37ab97d2cbad'
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default_secret_key')
 db.init_app(app)
+jwt.init_app(app)
 migrate = Migrate(app, db)
 
+#creating a new user to the database
+# User registration route
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    # Check if the username or email already exists
+    if User.query.filter_by(username=username).first():
+        return jsonify({'message': 'Username already exists'}), 400
+
+    # if User.query.filter_by(email=email).first():
+    #     return jsonify({'message': 'Email already exists'}), 400
+
+    # Create a new user
+    user = User(username=username,password=password)
+    db.session.add(user)
+    db.session.commit()
+
+    # Generate an access token for the newly registered user
+    access_token = create_access_token(identity=username)
+    return jsonify(access_token=access_token), 201
+
+#authentication when the user refreshes the page 
+@app.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    current_user = get_jwt_identity()
+    access_token = create_access_token(identity=current_user)
+
+    return jsonify(access_token=access_token), 200
+
+#logging a user with authentication 
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    if user.check_password(password):
+        access_token = create_access_token(identity=username)
+        return jsonify(access_token=access_token), 200
+    else:
+        return jsonify({'message': 'Invalid password'}), 401
 
 
 #home page 
