@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from models import db,User, Exercise, Workout
 from sqlalchemy.exc import IntegrityError
@@ -8,10 +8,12 @@ from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required, get_jwt_identity, create_refresh_token
 )
 import os
+from flask_cors import CORS
 
 # Initialize the JWT extension
 jwt = JWTManager()
 app = Flask(__name__)
+CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fitness_tracker.db'  # SQLite database
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Configure JWT settings
@@ -20,6 +22,7 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default_secret_
 db.init_app(app)
 jwt.init_app(app)
 migrate = Migrate(app, db)
+
 
 #creating a new user to the database
 # User registration route
@@ -43,7 +46,10 @@ def register():
 
     # Generate an access token for the newly registered user
     access_token = create_access_token(identity=username)
-    return jsonify(access_token=access_token), 201
+    # Create a redirection URL to the login page
+    redirect_url = url_for('login')
+
+    return jsonify(access_token=access_token, redirect=redirect_url), 201
 
 #authentication when the user refreshes the page 
 @app.route('/refresh', methods=['POST'])
@@ -68,13 +74,17 @@ def login():
 
     if user.check_password(password):
         access_token = create_access_token(identity=username)
-        return jsonify(access_token=access_token), 200
+
+        # Create a redirection URL to the home page
+        redirect_url = url_for('home')
+
+        return jsonify(access_token=access_token, redirect=redirect_url), 200
     else:
         return jsonify({'message': 'Invalid password'}), 401
 
 
 #home page 
-@app.route('/')
+@app.route('/home')
 def home():
     print("hello welcome to Fintech HomeWorks")
     return "Welcome to the Fintech HomeWorks"  # Return a valid response
